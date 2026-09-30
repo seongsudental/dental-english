@@ -11,11 +11,11 @@
 :root{
   --bg:#f5f6f8; --card:#fff; --ink:#1b1f29; --sub:#6b7280; --line:#e5e7eb;
   --navy:#1f2a44; --red:#d93636; --red-bg:#fdecec; --yel:#b7791f; --yel-bg:#fdf6e3;
-  --ok:#9ca3af; --green:#15803d; --fs:1;
+  --ok:#9ca3af; --green:#15803d; --blue:#2563eb; --blue-bg:#eaf1fe; --fs:1;
 }
 @media (prefers-color-scheme: dark){
   :root{ --bg:#0f1219; --card:#181c26; --ink:#eef0f4; --sub:#9aa3b2; --line:#2a3040;
-    --red-bg:#3a1c1f; --yel-bg:#352c16; --ok:#6b7280; }
+    --red-bg:#3a1c1f; --yel-bg:#352c16; --blue-bg:#16233f; --ok:#6b7280; }
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -46,6 +46,7 @@ main{padding:14px 16px 80px;max-width:1100px;margin:0 auto}
   border-radius:12px;padding:12px 14px;margin-bottom:10px}
 .card.wrong{border-left-color:var(--red);background:var(--red-bg)}
 .card.awkward{border-left-color:var(--yel);background:var(--yel-bg)}
+.card.translate{border-left-color:var(--blue);background:var(--blue-bg)}
 .card.ok,.card.minor{opacity:.55}
 .card.pending{color:var(--sub);font-size:calc(15px*var(--fs))}
 .card.err{border-left-color:#7c3aed;font-size:14px}
@@ -81,12 +82,19 @@ main{padding:14px 16px 80px;max-width:1100px;margin:0 auto}
 .rv{border-bottom:1px solid var(--line);padding:8px 0}
 .rv .said{font-size:15px}.rv .fix{font-size:18px}
 a{color:#3b82f6}
+.linkbar{display:none;margin-top:8px;font-size:13px;background:rgba(255,255,255,.12);border-radius:8px;padding:6px 10px}
+.screen-only{display:none}
+body.screen-mode .screen-only{display:block}
+body.screen-mode #btnToggle, body.screen-mode .meter-wrap, body.screen-mode .status, body.screen-mode #empty{display:none !important}
+body.screen-mode.has-cards #screenHelp{display:none}
+.bigcode{font-size:64px;font-weight:800;letter-spacing:12px;margin:10px 0;color:var(--ink)}
 </style>
 </head>
 <body>
 <header>
   <div class="row">
     <div class="title">🦷 진료실 영어 교정기</div>
+    <button class="btn-ghost" id="btnLink">🖥️ 연결</button>
     <button class="btn-ghost" id="btnReview">복습</button>
     <button class="btn-ghost" id="btnSettings">⚙︎</button>
   </div>
@@ -94,6 +102,7 @@ a{color:#3b82f6}
     <button class="btn-main" id="btnToggle">▶ 시작</button>
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">대기 중</span></div>
   </div>
+  <div class="linkbar" id="linkBar"></div>
   <div class="meter-wrap">
     <div class="sens">🎤 소리<div class="meter" style="flex:1"><i id="lvl"></i><b id="thr"></b></div></div>
     <div class="sens">민감도
@@ -106,6 +115,11 @@ a{color:#3b82f6}
 <main>
   <div class="ignored" id="ignored"></div>
   <div id="list"></div>
+  <div class="empty screen-only" id="screenHelp">
+    <div style="font-size:15px">📱 아이폰 앱에서 <b>🖥️ 연결</b>을 누르고 이 번호를 입력하세요</div>
+    <div class="bigcode" id="screenCode">----</div>
+    <div style="font-size:13px">연결되면 폰에서 교정된 결과가 여기에 크게 표시됩니다.</div>
+  </div>
   <div class="empty" id="empty">
     ▶ <b>시작</b>을 누르고 영어로 말씀해 보세요.<br>
     한 문장 말하고 잠깐 멈추면 2~3초 뒤 교정 결과가 뜹니다.<br>
@@ -142,12 +156,37 @@ a{color:#3b82f6}
       <option value="1.25">크게</option><option value="1.5">아주 크게</option>
     </select>
   </div>
+  <div class="field">
+    <label>한국어로 말했을 때</label>
+    <select id="koMode">
+      <option value="trigger">"영어로"라고 시작할 때만 영어로 번역 (추천)</option>
+      <option value="off">번역 안 함 (무시)</option>
+    </select>
+    <small>예: "영어로, 신경치료 해야 돼요" → The nerve is inflamed, so we need a root canal.</small>
+  </div>
   <label class="chk"><input type="checkbox" id="showOk"> 맞은 문장도 흐리게 표시</label>
   <label class="chk"><input type="checkbox" id="showMinor"> 사소한 실수도 표시</label>
   <div class="field"><small>🔒 녹음은 문장 단위로 Gemini에 전송되고, 기기에는 저장되지 않습니다.
     진료실에서 실제 환자와 쓰실 때는 Google AI Studio에서 <b>결제(유료 요금제)를 켜두세요.</b>
     무료 요금제는 구글이 데이터를 학습에 사용할 수 있습니다.</small></div>
   <div class="sheet-btns"><button class="b2" id="sClose">닫기</button><button class="b1" id="sSave">저장</button></div>
+</div></div>
+
+<!-- link -->
+<div class="modal" id="mLink"><div class="sheet">
+  <h2>폰 ↔ PC 화면 연결</h2>
+  <div class="field">
+    <label>📱 이 폰을 마이크로 쓰기</label>
+    <input type="text" id="linkCode" inputmode="numeric" maxlength="4" placeholder="PC 화면의 숫자 4자리">
+    <div class="sheet-btns"><button class="b1" id="lMic">PC에 연결</button></div>
+    <small>폰이 듣고 교정한 결과가 PC 모니터에도 표시됩니다. 폰 화면은 켜둔 채로 두세요.</small>
+  </div>
+  <div class="field">
+    <label>🖥️ 이 기기를 화면으로 쓰기 (진료실 PC)</label>
+    <div class="sheet-btns"><button class="b1" id="lScreen">화면 모드 시작</button></div>
+    <small>숫자 4자리가 뜨면 폰에서 입력하세요. 번호는 다음에도 그대로 유지됩니다.</small>
+  </div>
+  <div class="sheet-btns"><button class="b2" id="lStop">연결 해제</button><button class="b2" id="lClose">닫기</button></div>
 </div></div>
 
 <!-- review -->
@@ -157,6 +196,7 @@ a{color:#3b82f6}
   <div class="sheet-btns"><button class="b2" id="rClose">닫기</button><button class="b1" id="rCopy">텍스트로 복사</button></div>
 </div></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
 <script>
 (() => {
 'use strict';
@@ -170,7 +210,7 @@ const store = {
 const S = {
   apiKey: store.get('apiKey',''), model: store.get('model','gemini-3.5-flash-lite'),
   mic: store.get('mic',''), fs: store.get('fs','1'), sens: store.get('sens',40),
-  showOk: store.get('showOk',true), showMinor: store.get('showMinor',false),
+  showOk: store.get('showOk',true), showMinor: store.get('showMinor',false), koMode: store.get('koMode','trigger') === 'off' ? 'off' : 'trigger',
 };
 document.documentElement.style.setProperty('--fs', S.fs);
 $('sens').value = S.sens;
@@ -188,7 +228,7 @@ renderSens();
 
 function openSettings(){
   $('apiKey').value = S.apiKey; $('model').value = S.model; $('fs').value = S.fs;
-  $('showOk').checked = S.showOk; $('showMinor').checked = S.showMinor;
+  $('showOk').checked = S.showOk; $('showMinor').checked = S.showMinor; $('koMode').value = S.koMode;
   fillMics().then(() => { $('mic').value = S.mic; });
   $('mSettings').classList.add('show');
 }
@@ -197,8 +237,8 @@ $('sClose').onclick = () => $('mSettings').classList.remove('show');
 $('sSave').onclick = () => {
   const micChanged = S.mic !== $('mic').value;
   S.apiKey = $('apiKey').value.trim(); S.model = $('model').value; S.mic = $('mic').value;
-  S.fs = $('fs').value; S.showOk = $('showOk').checked; S.showMinor = $('showMinor').checked;
-  for (const k of ['apiKey','model','mic','fs','showOk','showMinor']) store.set(k, S[k]);
+  S.fs = $('fs').value; S.showOk = $('showOk').checked; S.showMinor = $('showMinor').checked; S.koMode = $('koMode').value;
+  for (const k of ['apiKey','model','mic','fs','showOk','showMinor','koMode']) store.set(k, S[k]);
   document.documentElement.style.setProperty('--fs', S.fs);
   $('mSettings').classList.remove('show');
   if (micChanged && running) { stop(); start(); }
@@ -220,6 +260,7 @@ const PREROLL_MS = 300, END_SILENCE_MS = 1300, MAX_MS = 15000, MIN_VOICED_MS = 3
 function setStatus(text, cls){ $('statusText').textContent = text; $('dot').className = 'dot ' + (cls||''); }
 
 async function start(){
+  if (link.role === 'screen') return;
   if (!S.apiKey){ openSettings(); alertCard('먼저 설정(⚙︎)에서 Gemini API 키를 입력해 주세요.'); return; }
   try{
     const audio = { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 };
@@ -322,7 +363,7 @@ function toBase64(buf){
 const SYSTEM = `You are a real-time English coach for a Korean dentist who talks with English-speaking patients in a dental clinic treatment room. You receive one short audio clip from a microphone in the room.
 
 Return JSON with:
-- relevant: true only if the clip contains the dentist (a non-native, Korean-accented speaker) speaking English. Set false for: Korean speech, silence, noise, dental equipment sounds (suction, drill), unintelligible audio, or speech that is clearly a native English speaker (likely the patient).
+- relevant: true only if the clip contains the dentist (a non-native, Korean-accented speaker) speaking English, or Korean speech that must be translated under the KOREAN MODE rules below. Set false for: other Korean speech, silence, noise, dental equipment sounds (suction, drill), unintelligible audio, or speech that is clearly a native English speaker (likely the patient).
 - transcript: transcribe EXACTLY what the dentist said, word for word. Preserve every grammar mistake, missing article, wrong tense, wrong word. Never fix anything here. Omit fillers like "um", "uh".
 - verdict: one of
   "ok" = correct and natural. Short clinical commands such as "Open wide", "Bite down", "Rinse, please", "Turn your head this way" are ok.
@@ -336,6 +377,11 @@ Return JSON with:
 - cut_off: true if the clip ends in the middle of a sentence (the dentist paused or was interrupted).
 - continuation: only when cut_off is true, a short natural guess of how the dentist's sentence most likely continues, based on the context and dental situation. Write only the missing ending, starting with "…" (e.g., "…going to take it slowly."). Otherwise empty string.
 
+KOREAN MODE (given with each request). It applies ONLY to speech that is actually in the Korean language. English speech — even with a strong Korean accent — is NEVER translated: always transcribe it in English and give an ok/minor/awkward/wrong verdict. Never use verdict "translate" unless the transcript is written in Korean (Hangul).
+- "trigger": if a Korean utterance starts with "영어로" (e.g., "영어로, 신경치료 해야 돼요"), translate it. Any other Korean speech is staff conversation: relevant=false.
+- "off": all Korean speech is relevant=false.
+When translating: relevant=true, verdict="translate", transcript = the Korean sentence without the "영어로" trigger, corrected = what a friendly native-English-speaking dentist would say to the patient (natural, short, patient-friendly, no jargon), explanation_ko = "", plain_tip = "", cut_off = false, continuation = "".
+
 You may also receive the dentist's previous few sentences as text context. Use them only to understand meaning (e.g., this clip may be the second half of a previous cut-off sentence). Analyze and correct only the new audio clip.
 If the clip is cut off, correct only the part that was spoken, end "corrected" with "…", and do not mark the cut-off itself as a mistake. Do not flag contractions, casual spoken style, or natural sentence fragments. Be strict about real mistakes, lenient about style.`;
 
@@ -343,7 +389,7 @@ const SCHEMA = {
   type:'OBJECT',
   properties:{
     relevant:{type:'BOOLEAN'}, transcript:{type:'STRING'},
-    verdict:{type:'STRING', enum:['ok','minor','awkward','wrong']},
+    verdict:{type:'STRING', enum:['ok','minor','awkward','wrong','translate']},
     corrected:{type:'STRING'}, explanation_ko:{type:'STRING'}, plain_tip:{type:'STRING'},
     cut_off:{type:'BOOLEAN'}, continuation:{type:'STRING'}
   },
@@ -372,10 +418,7 @@ async function callModel(model, b64, context){
     systemInstruction:{ parts:[{ text: SYSTEM }] },
     contents:[{ role:'user', parts:[
       { inlineData:{ mimeType:'audio/wav', data:b64 } },
-      { text: context ? `Previous sentences by the dentist (context only):
-${context}
-
-Analyze the new clip.` : 'Analyze this clip.' } ] }],
+      { text: `KOREAN MODE: ${S.koMode}\n` + (context ? `Previous sentences by the dentist (context only):\n${context}\n\nAnalyze the new clip.` : 'Analyze this clip.') } ] }],
     generationConfig:{ responseMimeType:'application/json', responseSchema:SCHEMA, temperature:0 }
   };
   if (useThinkingCfg) body.generationConfig.thinkingConfig = { thinkingLevel:'low' };
@@ -397,61 +440,166 @@ Analyze the new clip.` : 'Analyze this clip.' } ] }],
   return JSON.parse(txt);
 }
 
+// ---------- phone → PC screen link (WebRTC via PeerJS) ----------
+// the phone ("mic") analyzes and pushes card data; the PC ("screen") only draws it.
+const PEER_PREFIX = 'seongsu-dental-eng-';
+const link = {
+  peer:null, conns:[], retry:null,
+  role: store.get('linkRole',''), code: store.get('linkCode',''),
+  send(msg){
+    if (this.role !== 'mic') return;
+    this.conns = this.conns.filter(c => c.open);
+    this.conns.forEach(c => { try{ c.send(msg); }catch{} });
+  },
+};
+function setLinkBar(text){ $('linkBar').textContent = text; $('linkBar').style.display = text ? 'block' : 'none'; }
+function resetPeer(){
+  clearTimeout(link.retry); link.retry = null;
+  try{ link.peer?.destroy(); }catch{}
+  link.peer = null; link.conns = [];
+}
+function stopLink(){
+  resetPeer(); link.role = ''; store.set('linkRole','');
+  document.body.classList.remove('screen-mode'); setLinkBar('');
+}
+function peerReady(){
+  if (typeof Peer === 'undefined'){ setLinkBar('⚠️ 연결 기능을 불러오지 못했습니다. 인터넷 확인 후 새로고침해 주세요.'); return false; }
+  return true;
+}
+
+function startScreen(){
+  if (!peerReady()) return;
+  if (running) stop();
+  resetPeer();
+  link.role = 'screen'; store.set('linkRole','screen');
+  if (!/^\d{4}$/.test(link.code)){ link.code = String(Math.floor(1000 + Math.random()*9000)); store.set('linkCode', link.code); }
+  document.body.classList.add('screen-mode');
+  $('screenCode').textContent = link.code;
+  setLinkBar(`🖥️ 화면 모드 · 연결 코드 ${link.code} · 폰 연결 대기 중`);
+  const peer = link.peer = new Peer(PEER_PREFIX + link.code);
+  peer.on('connection', conn => {
+    conn.on('open', () => setLinkBar(`🖥️ 화면 모드 · 코드 ${link.code} · 📱 폰 연결됨`));
+    conn.on('data', onLinkData);
+    conn.on('close', () => setLinkBar(`🖥️ 화면 모드 · 코드 ${link.code} · 폰 연결 끊김 (다시 연결 대기 중)`));
+  });
+  peer.on('disconnected', () => { try{ peer.reconnect(); }catch{} });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id'){ link.code = ''; store.set('linkCode',''); }
+    setLinkBar('🖥️ 연결 서버 오류 — 잠시 후 다시 시도합니다');
+    link.retry = setTimeout(() => { if (link.role === 'screen') startScreen(); }, 3000);
+  });
+}
+function onLinkData(msg){
+  if (!msg || typeof msg !== 'object') return;
+  if (msg.t === 'card' && typeof msg.id === 'string' && msg.p) paint(msg.id, msg.p);
+  else if (msg.t === 'remove' && typeof msg.id === 'string') removeCard(msg.id);
+  else if (msg.t === 'ignored') setIgnored(+msg.n || 0);
+}
+
+function connectMic(code){
+  if (!peerReady()) return;
+  if (!/^\d{4}$/.test(code)){ setLinkBar('⚠️ PC 화면에 보이는 숫자 4자리를 입력해 주세요.'); return; }
+  resetPeer();
+  link.role = 'mic'; link.code = code; store.set('linkRole','mic'); store.set('linkCode', code);
+  document.body.classList.remove('screen-mode');
+  setLinkBar(`🖥️ PC(${code})에 연결 중…`);
+  const retry = () => { clearTimeout(link.retry); link.retry = setTimeout(() => { if (link.role === 'mic') connectMic(code); }, 4000); };
+  const peer = link.peer = new Peer();
+  peer.on('open', () => {
+    const conn = peer.connect(PEER_PREFIX + code, { reliable:true });
+    conn.on('open', () => { link.conns.push(conn); setLinkBar(`🖥️ PC 화면(${code})에 연결됨 — 결과가 PC에도 표시됩니다`);
+      conn.send({ t:'ignored', n: ignoredCount }); });
+    conn.on('close', () => { setLinkBar(`🖥️ PC 연결 끊김 — 다시 연결 중…`); retry(); });
+  });
+  peer.on('error', e => {
+    setLinkBar(e.type === 'peer-unavailable' ? `🖥️ 코드 ${code}인 PC 화면을 찾는 중… (PC에서 화면 모드를 켜주세요)` : '🖥️ 연결 오류 — 다시 시도 중…');
+    retry();
+  });
+}
+
+function openLink(){
+  $('linkCode').value = link.role === 'mic' ? link.code : '';
+  $('mLink').classList.add('show');
+}
+$('btnLink').onclick = openLink;
+$('lClose').onclick = () => $('mLink').classList.remove('show');
+$('lMic').onclick = () => { connectMic($('linkCode').value.trim()); $('mLink').classList.remove('show'); };
+$('lScreen').onclick = () => { startScreen(); $('mLink').classList.remove('show'); };
+$('lStop').onclick = () => { stopLink(); $('mLink').classList.remove('show'); };
+
 // ---------- UI ----------
 const session = []; let ignoredCount = 0;
 const esc = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hhmm = d => d.toTimeString().slice(0,5);
 
-function newCard(){
-  $('empty').style.display = 'none';
-  const el = document.createElement('div'); el.className = 'card pending';
-  el.textContent = '🎧 분석 중…';
-  $('list').prepend(el); return el;
+// cards are drawn from plain data so the same payload can be mirrored to a linked PC screen
+const cards = new Map();
+function getCard(id){
+  let el = cards.get(id);
+  if (!el){
+    $('empty').style.display = 'none'; document.body.classList.add('has-cards');
+    el = document.createElement('div'); cards.set(id, el); $('list').prepend(el);
+  }
+  return el;
 }
-function alertCard(msg){
-  $('empty').style.display = 'none';
-  const el = document.createElement('div'); el.className = 'card err'; el.textContent = '⚠️ ' + msg;
-  $('list').prepend(el);
+function removeCard(id){ cards.get(id)?.remove(); cards.delete(id); }
+function setIgnored(n){ $('ignored').textContent = n ? `무시한 소리 ${n}건 (한국어·잡음·환자 말 등)` : ''; }
+
+function paint(id, p){
+  const card = getCard(id);
+  if (p.kind === 'pending'){ card.className = 'card pending'; card.textContent = '🎧 분석 중…'; return; }
+  if (p.kind === 'err'){ card.className = 'card err'; card.textContent = '⚠️ ' + p.msg; return; }
+  const r = p.r, v = p.v, meta = `<span class="meta">${esc(hhmm(new Date(p.at)))}</span>`;
+  card.className = 'card ' + v;
+  if (v === 'translate'){
+    card.innerHTML = `${meta}<div class="said">🇰🇷 ${esc(r.transcript)}</div>
+      <div class="fix">🇺🇸 ${esc(r.corrected)}</div>`;
+  } else if (v === 'ok'){
+    card.innerHTML = `${meta}<div class="said">✓ ${esc(r.transcript)}</div>`;
+  } else {
+    const icon = v==='wrong' ? '🔴' : v==='awkward' ? '🟡' : '·';
+    card.innerHTML = `${meta}<div class="said">${icon} ${esc(r.transcript)}</div>
+      <div class="fix">✅ ${esc(r.corrected)}</div>
+      ${r.explanation_ko ? `<div class="why">💬 ${esc(r.explanation_ko)}</div>` : ''}`;
+  }
+  if (r.cut_off && r.continuation) card.innerHTML += `<div class="cont">💡 이어서 말한다면: ${esc(r.continuation)}</div>`;
+  if (r.plain_tip) card.innerHTML += `<div class="tip">🗣 쉬운 말: ${esc(r.plain_tip)}</div>`;
 }
+// local draw + mirror to linked screen
+function show(id, p){ paint(id, p); link.send({ t:'card', id, p }); }
+function hide(id){ removeCard(id); link.send({ t:'remove', id }); }
+
+let cardSeq = 0;
+function alertCard(msg){ show('a' + (++cardSeq), { kind:'err', msg }); }
 
 async function analyze(wav){
-  const card = newCard(), at = new Date();
+  const id = 'c' + Date.now() + '_' + (++cardSeq), at = new Date().toISOString();
+  show(id, { kind:'pending' });
   try{
     const context = session.slice(-3).map(x => '- ' + x.transcript + (x.cut_off ? ' (cut off)' : '')).join('\n');
     const r = await callGemini(toBase64(wav), context);
-    if (!r.relevant || !r.transcript){ card.remove(); ignoredCount++;
-      $('ignored').textContent = `무시한 소리 ${ignoredCount}건 (한국어·잡음·환자 말 등)`; return; }
+    if (!r.relevant || !r.transcript){
+      hide(id); ignoredCount++; setIgnored(ignoredCount); link.send({ t:'ignored', n: ignoredCount }); return; }
     let v = r.verdict;
     if (v === 'minor' && !S.showMinor) v = 'ok';
     session.push({ at, ...r });
-    if (v === 'ok' && !S.showOk){ card.remove(); return; }
-    const meta = `<span class="meta">${hhmm(at)}</span>`;
-    card.className = 'card ' + v;
-    if (v === 'ok'){
-      card.innerHTML = `${meta}<div class="said">✓ ${esc(r.transcript)}</div>`;
-    } else {
-      const icon = v==='wrong' ? '🔴' : v==='awkward' ? '🟡' : '·';
-      card.innerHTML = `${meta}<div class="said">${icon} ${esc(r.transcript)}</div>
-        <div class="fix">✅ ${esc(r.corrected)}</div>
-        ${r.explanation_ko ? `<div class="why">💬 ${esc(r.explanation_ko)}</div>` : ''}`;
-    }
-    if (r.cut_off && r.continuation) card.innerHTML += `<div class="cont">💡 이어서 말한다면: ${esc(r.continuation)}</div>`;
-    if (r.plain_tip) card.innerHTML += `<div class="tip">🗣 쉬운 말: ${esc(r.plain_tip)}</div>`;
+    if (v === 'ok' && !S.showOk){ hide(id); return; }
+    show(id, { kind:'res', r, v, at });
   }catch(e){
-    card.className = 'card err';
     const s = e.status;
-    card.textContent = '⚠️ ' + (s===400||s===403 ? 'API 키 또는 모델 설정을 확인해 주세요.'
+    const msg = (s===400||s===403 ? 'API 키 또는 모델 설정을 확인해 주세요.'
       : s===429 ? '사용 한도 초과 — 잠시 후 다시 시도되거나, 결제를 켜면 해결됩니다.'
       : s===404 ? '모델을 찾을 수 없습니다. 설정에서 다른 모델을 골라주세요.'
       : s===503 || s===500 || e.name==='AbortError' ? '구글 서버가 혼잡해 이 문장은 건너뛰었습니다.'
       : !navigator.onLine ? '인터넷 연결이 끊겼습니다.' : '분석 실패') + (s ? ` (${s})` : '');
+    show(id, { kind:'err', msg });
     console.error(e);
   }
 }
 
 // review
 $('btnReview').onclick = () => {
-  const items = session.filter(r => r.verdict==='wrong' || r.verdict==='awkward' || (S.showMinor && r.verdict==='minor') || r.plain_tip);
+  const items = session.filter(r => r.verdict==='wrong' || r.verdict==='awkward' || r.verdict==='translate' || (S.showMinor && r.verdict==='minor') || r.plain_tip);
   $('reviewList').innerHTML = items.length ? items.map(r => `<div class="rv">
     <div class="said">${esc(r.transcript)}</div><div class="fix">→ ${esc(r.corrected)}</div>
     ${r.explanation_ko ? `<div class="why">${esc(r.explanation_ko)}</div>`:''}
@@ -476,7 +624,9 @@ document.addEventListener('keydown', e => {
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible' && running){ try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch{} }
 });
-if (!S.apiKey) setTimeout(openSettings, 300);
+if (link.role === 'screen') startScreen();
+else if (link.role === 'mic' && link.code) connectMic(link.code);
+if (!S.apiKey && link.role !== 'screen') setTimeout(openSettings, 300);
 })();
 </script>
 </body>
