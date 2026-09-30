@@ -87,7 +87,7 @@ a{color:#3b82f6}
 body.screen-mode .screen-only{display:block}
 body.screen-mode #btnToggle, body.screen-mode .meter-wrap, body.screen-mode .status, body.screen-mode #empty{display:none !important}
 body.screen-mode.has-cards #screenHelp{display:none}
-.bigcode{font-size:64px;font-weight:800;letter-spacing:12px;margin:10px 0;color:var(--ink)}
+.bigcode{font-size:clamp(36px,9vw,64px);font-weight:800;letter-spacing:6px;margin:10px 0;color:var(--ink)}
 </style>
 </head>
 <body>
@@ -116,8 +116,8 @@ body.screen-mode.has-cards #screenHelp{display:none}
   <div class="ignored" id="ignored"></div>
   <div id="list"></div>
   <div class="empty screen-only" id="screenHelp">
-    <div style="font-size:15px">📱 아이폰 앱에서 <b>🖥️ 연결</b>을 누르고 이 번호를 입력하세요</div>
-    <div class="bigcode" id="screenCode">----</div>
+    <div style="font-size:15px">📱 아이폰 앱에서 <b>🖥️ 연결</b>을 누르고 아래 번호 8자리를 입력하세요</div>
+    <div class="bigcode" id="screenCode">---- ----</div>
     <div style="font-size:13px">연결되면 폰에서 교정된 결과가 여기에 크게 표시됩니다.</div>
   </div>
   <div class="empty" id="empty">
@@ -177,14 +177,14 @@ body.screen-mode.has-cards #screenHelp{display:none}
   <h2>폰 ↔ PC 화면 연결</h2>
   <div class="field">
     <label>📱 이 폰을 마이크로 쓰기</label>
-    <input type="text" id="linkCode" inputmode="numeric" maxlength="4" placeholder="PC 화면의 숫자 4자리">
+    <input type="text" id="linkCode" inputmode="numeric" maxlength="9" placeholder="PC 화면의 숫자 8자리">
     <div class="sheet-btns"><button class="b1" id="lMic">PC에 연결</button></div>
-    <small>폰이 듣고 교정한 결과가 PC 모니터에도 표시됩니다. 폰 화면은 켜둔 채로 두세요.</small>
+    <small>폰이 듣고 교정한 결과가 PC 모니터에도 표시됩니다. 내용은 암호화되어 전송됩니다. 폰 화면은 켜둔 채로 두세요.</small>
   </div>
   <div class="field">
     <label>🖥️ 이 기기를 화면으로 쓰기 (진료실 PC)</label>
     <div class="sheet-btns"><button class="b1" id="lScreen">화면 모드 시작</button></div>
-    <small>숫자 4자리가 뜨면 폰에서 입력하세요. 번호는 다음에도 그대로 유지됩니다.</small>
+    <small>숫자 8자리가 뜨면 폰에서 입력하세요. 번호는 다음에도 그대로 유지됩니다.</small>
   </div>
   <div class="sheet-btns"><button class="b2" id="lStop">연결 해제</button><button class="b2" id="lClose">닫기</button></div>
 </div></div>
@@ -196,7 +196,6 @@ body.screen-mode.has-cards #screenHelp{display:none}
   <div class="sheet-btns"><button class="b2" id="rClose">닫기</button><button class="b1" id="rCopy">텍스트로 복사</button></div>
 </div></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
 <script>
 (() => {
 'use strict';
@@ -440,90 +439,110 @@ async function callModel(model, b64, context){
   return JSON.parse(txt);
 }
 
-// ---------- phone → PC screen link (WebRTC via PeerJS) ----------
-// the phone ("mic") analyzes and pushes card data; the PC ("screen") only draws it.
-const PEER_PREFIX = 'seongsu-dental-eng-';
+// ---------- phone → PC screen link (end-to-end encrypted relay via ntfy.sh) ----------
+// the phone ("mic") analyzes and pushes finished cards; the PC ("screen") only draws them.
+// the 8-digit pairing code never leaves the devices: it derives both the relay topic and the AES key.
+const RELAY = 'https://ntfy.sh/';
 const link = {
-  peer:null, conns:[], retry:null,
+  es:null, key:null, topic:null, gen:0,
   role: store.get('linkRole',''), code: store.get('linkCode',''),
-  send(msg){
-    if (this.role !== 'mic') return;
-    this.conns = this.conns.filter(c => c.open);
-    this.conns.forEach(c => { try{ c.send(msg); }catch{} });
+  async send(msg){
+    if (this.role !== 'mic' || !this.key) return;
+    if (msg.t !== 'card' && msg.t !== 'hello') return;
+    if (msg.t === 'card' && msg.p.kind === 'pending') return;   // save relay quota: finished cards only
+    try{
+      const res = await fetch(RELAY + this.topic, { method:'POST', body: await encryptMsg(msg),
+        headers:{ 'Cache':'no', 'Firebase':'no' } });
+      if (!res.ok) setLinkBar(res.status === 429 ? '⚠️ 오늘 PC 전송 한도 초과 — 폰 화면에는 계속 표시됩니다' : `⚠️ PC 전송 실패 (${res.status})`);
+      else setLinkBar(`🖥️ PC 화면(${fmtCode(this.code)})으로 전송 중`);
+    }catch{ setLinkBar('⚠️ PC 전송 실패 — 인터넷 연결을 확인해 주세요'); }
   },
 };
+const fmtCode = c => c.slice(0,4) + ' ' + c.slice(4);
 function setLinkBar(text){ $('linkBar').textContent = text; $('linkBar').style.display = text ? 'block' : 'none'; }
-function resetPeer(){
-  clearTimeout(link.retry); link.retry = null;
-  try{ link.peer?.destroy(); }catch{}
-  link.peer = null; link.conns = [];
+
+const te = new TextEncoder(), td = new TextDecoder();
+async function deriveLink(code){
+  const base = await crypto.subtle.importKey('raw', te.encode(code), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt: te.encode('seongsu-dental-eng-v1'), iterations:200000, hash:'SHA-256' },
+    base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', te.encode('seongsu-dental-eng-topic:' + code)));
+  const topic = 'sde' + Array.from(h.slice(0,16), b => b.toString(16).padStart(2,'0')).join('');
+  return { key, topic };
 }
-function stopLink(){
-  resetPeer(); link.role = ''; store.set('linkRole','');
-  document.body.classList.remove('screen-mode'); setLinkBar('');
+async function encryptMsg(msg){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, link.key, te.encode(JSON.stringify(msg))));
+  const all = new Uint8Array(12 + ct.length); all.set(iv); all.set(ct, 12);
+  return toBase64(all.buffer);
 }
-function peerReady(){
-  if (typeof Peer === 'undefined'){ setLinkBar('⚠️ 연결 기능을 불러오지 못했습니다. 인터넷 확인 후 새로고침해 주세요.'); return false; }
-  return true;
+async function decryptMsg(b64){
+  const all = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv: all.slice(0,12) }, link.key, all.slice(12));
+  return JSON.parse(td.decode(pt));
 }
 
-function startScreen(){
-  if (!peerReady()) return;
+function closeLink(){ link.gen++; link.es?.close(); link.es = null; link.key = null; }
+function stopLink(){
+  closeLink(); link.role = ''; store.set('linkRole','');
+  document.body.classList.remove('screen-mode'); setLinkBar('');
+}
+
+async function startScreen(){
   if (running) stop();
-  resetPeer();
+  closeLink(); const gen = link.gen;
   link.role = 'screen'; store.set('linkRole','screen');
-  if (!/^\d{4}$/.test(link.code)){ link.code = String(Math.floor(1000 + Math.random()*9000)); store.set('linkCode', link.code); }
+  if (!/^\d{8}$/.test(link.code)){
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] % 90000000 + 10000000;
+    link.code = String(n); store.set('linkCode', link.code);
+  }
   document.body.classList.add('screen-mode');
-  $('screenCode').textContent = link.code;
-  setLinkBar(`🖥️ 화면 모드 · 연결 코드 ${link.code} · 폰 연결 대기 중`);
-  const peer = link.peer = new Peer(PEER_PREFIX + link.code);
-  peer.on('connection', conn => {
-    conn.on('open', () => setLinkBar(`🖥️ 화면 모드 · 코드 ${link.code} · 📱 폰 연결됨`));
-    conn.on('data', onLinkData);
-    conn.on('close', () => setLinkBar(`🖥️ 화면 모드 · 코드 ${link.code} · 폰 연결 끊김 (다시 연결 대기 중)`));
-  });
-  peer.on('disconnected', () => { try{ peer.reconnect(); }catch{} });
-  peer.on('error', e => {
-    if (e.type === 'unavailable-id'){ link.code = ''; store.set('linkCode',''); }
-    setLinkBar('🖥️ 연결 서버 오류 — 잠시 후 다시 시도합니다');
-    link.retry = setTimeout(() => { if (link.role === 'screen') startScreen(); }, 3000);
-  });
+  $('screenCode').textContent = fmtCode(link.code);
+  setLinkBar(`🖥️ 화면 모드 · 연결 코드 ${fmtCode(link.code)} · 준비 중…`);
+  const { key, topic } = await deriveLink(link.code);
+  if (gen !== link.gen) return;
+  link.key = key; link.topic = topic;
+  const es = link.es = new EventSource(RELAY + topic + '/sse');
+  es.onopen = () => setLinkBar(`🖥️ 화면 모드 · 연결 코드 ${fmtCode(link.code)} · 폰 기다리는 중`);
+  es.onerror = () => setLinkBar(`🖥️ 화면 모드 · 코드 ${fmtCode(link.code)} · 인터넷 재연결 중…`);
+  es.onmessage = async e => {
+    try{
+      const d = JSON.parse(e.data);
+      if (d.event !== 'message' || !d.message) return;
+      onLinkData(await decryptMsg(d.message));
+    }catch{}   // not ours / undecryptable: ignore
+  };
 }
 function onLinkData(msg){
   if (!msg || typeof msg !== 'object') return;
-  if (msg.t === 'card' && typeof msg.id === 'string' && msg.p) paint(msg.id, msg.p);
-  else if (msg.t === 'remove' && typeof msg.id === 'string') removeCard(msg.id);
-  else if (msg.t === 'ignored') setIgnored(+msg.n || 0);
+  if (msg.t === 'hello') setLinkBar(`🖥️ 화면 모드 · 코드 ${fmtCode(link.code)} · 📱 폰 연결됨`);
+  else if (msg.t === 'card' && typeof msg.id === 'string' && msg.p){
+    paint(msg.id, msg.p);
+    setLinkBar(`🖥️ 화면 모드 · 코드 ${fmtCode(link.code)} · 📱 폰 연결됨`);
+  }
 }
 
-function connectMic(code){
-  if (!peerReady()) return;
-  if (!/^\d{4}$/.test(code)){ setLinkBar('⚠️ PC 화면에 보이는 숫자 4자리를 입력해 주세요.'); return; }
-  resetPeer();
+async function connectMic(code){
+  code = String(code).replace(/\D/g, '');
+  if (!/^\d{8}$/.test(code)){ setLinkBar('⚠️ PC 화면에 보이는 숫자 8자리를 입력해 주세요.'); return; }
+  closeLink(); const gen = link.gen;
   link.role = 'mic'; link.code = code; store.set('linkRole','mic'); store.set('linkCode', code);
   document.body.classList.remove('screen-mode');
-  setLinkBar(`🖥️ PC(${code})에 연결 중…`);
-  const retry = () => { clearTimeout(link.retry); link.retry = setTimeout(() => { if (link.role === 'mic') connectMic(code); }, 4000); };
-  const peer = link.peer = new Peer();
-  peer.on('open', () => {
-    const conn = peer.connect(PEER_PREFIX + code, { reliable:true });
-    conn.on('open', () => { link.conns.push(conn); setLinkBar(`🖥️ PC 화면(${code})에 연결됨 — 결과가 PC에도 표시됩니다`);
-      conn.send({ t:'ignored', n: ignoredCount }); });
-    conn.on('close', () => { setLinkBar(`🖥️ PC 연결 끊김 — 다시 연결 중…`); retry(); });
-  });
-  peer.on('error', e => {
-    setLinkBar(e.type === 'peer-unavailable' ? `🖥️ 코드 ${code}인 PC 화면을 찾는 중… (PC에서 화면 모드를 켜주세요)` : '🖥️ 연결 오류 — 다시 시도 중…');
-    retry();
-  });
+  setLinkBar(`🖥️ PC(${fmtCode(code)}) 연결 준비 중…`);
+  const { key, topic } = await deriveLink(code);
+  if (gen !== link.gen) return;
+  link.key = key; link.topic = topic;
+  await link.send({ t:'hello' });
 }
 
 function openLink(){
-  $('linkCode').value = link.role === 'mic' ? link.code : '';
+  $('linkCode').value = link.role === 'mic' ? fmtCode(link.code) : '';
   $('mLink').classList.add('show');
 }
 $('btnLink').onclick = openLink;
 $('lClose').onclick = () => $('mLink').classList.remove('show');
-$('lMic').onclick = () => { connectMic($('linkCode').value.trim()); $('mLink').classList.remove('show'); };
+$('lMic').onclick = () => { connectMic($('linkCode').value); $('mLink').classList.remove('show'); };
 $('lScreen').onclick = () => { startScreen(); $('mLink').classList.remove('show'); };
 $('lStop').onclick = () => { stopLink(); $('mLink').classList.remove('show'); };
 
