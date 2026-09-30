@@ -72,6 +72,13 @@ main{max-width:1100px;margin:0 auto;padding:16px 16px calc(150px + env(safe-area
 .why{font-size:calc(14.5px*var(--fs));margin-top:10px;padding:9px 12px;background:var(--bg);border-radius:12px;line-height:1.45}
 .cont{font-size:calc(15px*var(--fs));margin-top:8px;color:var(--sub);font-style:italic}
 .tip{font-size:calc(14px*var(--fs));margin-top:8px;color:var(--okc);font-weight:600}
+.pron{font-size:calc(17px*var(--fs));margin-top:6px;color:var(--tr);font-weight:600;line-height:1.4}
+.pron .lbl{font-size:11px;font-weight:700;color:var(--faint);margin-right:6px}
+.say{margin-left:auto;display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--tr);
+  background:var(--tr-bg);padding:5px 11px;border-radius:999px}
+.say+.meta{margin-left:0}
+:lang(ja){font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo","Noto Sans JP",sans-serif}
+.ibtn.lang b{font-size:13px;font-weight:800;line-height:22px;height:22px;padding:0 5px;border:1.8px solid currentColor;border-radius:6px}
 .card.ok{box-shadow:none;background:transparent;padding:10px 16px}
 .card.ok .fix{font-size:calc(16px*var(--fs));font-weight:500;color:var(--sub)}
 .card.pending{color:var(--sub);font-size:calc(15px*var(--fs));box-shadow:none}
@@ -178,8 +185,9 @@ body.screen-mode main{padding-bottom:40px}
           stroke-dasharray="56 13.1" transform="rotate(-38 16 16)"/>
         <circle cx="19.4" cy="5.54" r="2.9" fill="#00b3a4"/>
       </svg>
-      <div class="word"><b>Open</b> <span>Language</span><small>Dental English Coach</small></div>
+      <div class="word"><b>Open</b> <span>Language</span><small id="subTitle">Dental English Coach</small></div>
     </div>
+    <button class="ibtn lang" id="btnLang" title="언어 바꾸기"><b id="langCode">EN</b>언어</button>
     <button class="ibtn" id="btnLink" title="PC 화면 연결">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>연결</button>
     <button class="ibtn" id="btnReview" title="오늘의 복습">
@@ -200,14 +208,15 @@ body.screen-mode main{padding-bottom:40px}
   </div>
   <div id="list"></div>
   <div class="empty" id="empty">
-    <h1>자신 있게, 영어로 진료하세요</h1>
-    <p>말하는 영어를 실시간으로 듣고, 더 자연스러운 표현으로 바로 고쳐드립니다.</p>
+    <h1 id="eTitle">자신 있게, 영어로 진료하세요</h1>
+    <p id="eDesc">말하는 영어를 실시간으로 듣고, 더 자연스러운 표현으로 바로 고쳐드립니다.</p>
     <div class="steps">
       <div class="step"><i>1</i><div>아래 마이크 버튼을<br>누르세요</div></div>
-      <div class="step"><i>2</i><div>평소처럼 환자에게<br>영어로 말하세요</div></div>
-      <div class="step"><i>3</i><div>2~3초 뒤 교정 문장이<br>크게 표시됩니다</div></div>
+      <div class="step"><i>2</i><div id="eStep2">평소처럼 환자에게<br>영어로 말하세요</div></div>
+      <div class="step"><i>3</i><div id="eStep3">2~3초 뒤 교정 문장이<br>크게 표시됩니다</div></div>
     </div>
-    <div class="hint">한국어는 <b>"영어로, …"</b> 라고 시작하면 영어로 번역해 드립니다.<br>
+    <div class="hint"><span id="eHint">한국어는 <b>"영어로, …"</b> 라고 시작하면 영어로 번역해 드립니다.</span><br>
+      상단 <b>언어</b>를 누르면 영어 → 프랑스어 → 일본어로 바뀝니다.<br>
       PC 모니터로 보려면 상단 <b>연결</b>을 누르세요. PC에서는 스페이스바로 켜고 끕니다.</div>
   </div>
   <div class="foot">Open Language · Edited by <b>안도관</b></div>
@@ -227,6 +236,24 @@ body.screen-mode main{padding-bottom:40px}
 <div class="modal" id="mSettings"><div class="sheet">
   <div class="grab"></div>
   <div class="sh-head"><h2>설정</h2><button class="x" id="sX" aria-label="닫기">✕</button></div>
+
+  <div class="group">언어</div>
+  <div class="field">
+    <select id="lang">
+      <option value="en">🇺🇸 영어 — 내 영어 교정 + "영어로" 번역</option>
+      <option value="fr">🇫🇷 프랑스어 — 한국어로 말하면 통역</option>
+      <option value="ja">🇯🇵 일본어 — 한국어로 말하면 통역</option>
+    </select>
+    <small>상단 <b>언어</b> 버튼으로도 바로 바꿀 수 있습니다.</small>
+  </div>
+  <div class="field">
+    <label>프랑스어·일본어 통역 방식</label>
+    <select id="xMode">
+      <option value="all">한국어는 모두 번역 (추천)</option>
+      <option value="trigger">"프랑스어로" / "일본어로"라고 시작할 때만 번역</option>
+    </select>
+    <small>직원끼리 하는 한국어 대화까지 번역돼서 불편하면 아래 방식으로 바꾸세요.</small>
+  </div>
 
   <div class="group">AI 연결</div>
   <div class="field">
@@ -267,7 +294,7 @@ body.screen-mode main{padding-bottom:40px}
   <label class="chk"><input type="checkbox" id="showOk"> 맞게 말한 문장도 표시</label>
   <label class="chk"><input type="checkbox" id="showMinor"> 사소한 실수도 표시</label>
 
-  <div class="group">한국어</div>
+  <div class="group">한국어 (영어 모드)</div>
   <div class="field">
     <select id="koMode">
       <option value="trigger">"영어로"라고 시작할 때만 영어로 번역 (추천)</option>
@@ -322,8 +349,43 @@ const S = {
   apiKey: store.get('apiKey',''), model: store.get('model','gemini-3.5-flash-lite'),
   mic: store.get('mic',''), fs: store.get('fs','1'), sens: store.get('sens',40),
   showOk: store.get('showOk',true), showMinor: store.get('showMinor',true), koMode: store.get('koMode','trigger') === 'off' ? 'off' : 'trigger',
+  lang: store.get('lang','en'), xMode: store.get('xMode','all') === 'trigger' ? 'trigger' : 'all',
 };
 document.documentElement.style.setProperty('--fs', S.fs);
+
+// ---------- languages ----------
+// en = coach my English; fr/ja = interpret my Korean for the patient (same pipeline, different prompt)
+const LANGS = {
+  en:{ code:'EN', ko:'영어', name:'English', tts:'en-US', sub:'Dental English Coach' },
+  fr:{ code:'FR', ko:'프랑스어', name:'French', tts:'fr-FR', sub:'Dental French · 통역', trig:'프랑스어로',
+    style:'Address the patient with "vous".',
+    ex:'"Ouvrez grand la bouche, s\'il vous plaît." → "우브레 그랑 라 부슈, 실 부 플레."' },
+  ja:{ code:'JA', ko:'일본어', name:'Japanese', tts:'ja-JP', sub:'Dental Japanese · 통역', trig:'일본어로',
+    style:'Use polite です/ます form (丁寧語) as a Japanese dental clinic would. Write in normal kanji and kana.',
+    ex:'"お口を大きく開けてください。" → "오쿠치오 오오키쿠 아케테 쿠다사이."' },
+};
+if (!LANGS[S.lang]) S.lang = 'en';
+const L = () => LANGS[S.lang];
+const listenText = () => S.lang === 'en' ? '듣는 중 · 영어로 말씀하세요' : `듣는 중 · 한국어로 말씀하세요 (${L().ko}로 통역)`;
+function applyLang(){
+  const l = L(), en = S.lang === 'en';
+  $('langCode').textContent = l.code;
+  $('subTitle').textContent = l.sub;
+  $('eTitle').textContent = en ? '자신 있게, 영어로 진료하세요' : `한국어로 말하면, ${l.ko}로 통역해 드려요`;
+  $('eDesc').textContent = en ? '말하는 영어를 실시간으로 듣고, 더 자연스러운 표현으로 바로 고쳐드립니다.'
+    : `평소처럼 한국어로 설명하세요. 환자에게 보여줄 ${l.ko} 문장과 읽는 법, 음성 재생 버튼이 바로 뜹니다.`;
+  $('eStep2').innerHTML = en ? '평소처럼 환자에게<br>영어로 말하세요' : '평소처럼<br>한국어로 말하세요';
+  $('eStep3').innerHTML = en ? '2~3초 뒤 교정 문장이<br>크게 표시됩니다' : `2~3초 뒤 ${esc(l.ko)} 문장이<br>크게 표시됩니다`;
+  $('eHint').innerHTML = en ? '한국어는 <b>"영어로, …"</b> 라고 시작하면 영어로 번역해 드립니다.'
+    : `🔊 버튼을 누르면 ${esc(l.ko)}로 읽어줍니다. 환자에게 화면을 보여주셔도 됩니다.`;
+  if (running) setStatus(listenText(), document.body.dataset.mic);
+}
+$('btnLang').onclick = () => {
+  const keys = Object.keys(LANGS);
+  S.lang = keys[(keys.indexOf(S.lang) + 1) % keys.length]; store.set('lang', S.lang);
+  applyLang();
+  alertCard(`언어: ${L().ko} ${S.lang === 'en' ? '교정 모드' : '통역 모드 — 한국어로 말씀하세요'}`);
+};
 $('sens').value = S.sens;
 
 // sensitivity slider 1..100 -> RMS threshold (higher sensitivity = lower threshold)
@@ -340,6 +402,7 @@ renderSens();
 function openSettings(){
   $('apiKey').value = S.apiKey; $('model').value = S.model; $('fs').value = S.fs;
   $('showOk').checked = S.showOk; $('showMinor').checked = S.showMinor; $('koMode').value = S.koMode;
+  $('lang').value = S.lang; $('xMode').value = S.xMode;
   fillMics().then(() => { $('mic').value = S.mic; });
   $('mSettings').classList.add('show');
 }
@@ -349,8 +412,10 @@ $('sSave').onclick = () => {
   const micChanged = S.mic !== $('mic').value;
   S.apiKey = $('apiKey').value.trim(); S.model = $('model').value; S.mic = $('mic').value;
   S.fs = $('fs').value; S.showOk = $('showOk').checked; S.showMinor = $('showMinor').checked; S.koMode = $('koMode').value;
-  for (const k of ['apiKey','model','mic','fs','showOk','showMinor','koMode']) store.set(k, S[k]);
+  S.lang = $('lang').value; S.xMode = $('xMode').value;
+  for (const k of ['apiKey','model','mic','fs','showOk','showMinor','koMode','lang','xMode']) store.set(k, S[k]);
   document.documentElement.style.setProperty('--fs', S.fs);
+  applyLang();
   $('mSettings').classList.remove('show');
   if (micChanged && running) { stop(); start(); }
 };
@@ -389,7 +454,7 @@ async function start(){
   proc.onaudioprocess = onAudio;
   src.connect(proc); proc.connect(sink); sink.connect(ctx.destination);
   running = true; state = 'idle'; chunks = []; preroll = [];
-  setStatus('듣는 중 · 영어로 말씀하세요', 'on');
+  setStatus(listenText(), 'on');
   try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch{}
   fillMics();
   requestAnimationFrame(drawMeter);
@@ -429,7 +494,7 @@ function onAudio(e){
 function finishUtterance(){
   const rate = ctx.sampleRate, parts = chunks, voiced = voicedMs;
   state = 'idle'; chunks = []; preroll = [];
-  if (running) setStatus('듣는 중 · 영어로 말씀하세요', 'on');
+  if (running) setStatus(listenText(), 'on');
   if (voiced < MIN_VOICED_MS) return;
   const wav = encodeWav(parts, rate, 16000);
   analyze(wav);
@@ -506,6 +571,29 @@ const SCHEMA = {
   required:['relevant','transcript','verdict','corrected','explanation_ko','plain_tip','cut_off','continuation']
 };
 
+// interpreter mode (fr/ja): the dentist speaks Korean, we give the patient-facing sentence + a Hangul reading guide
+const interpSystem = l => `You are a real-time medical interpreter for a Korean dentist treating a ${l.name}-speaking patient in a dental clinic treatment room. The dentist does not speak ${l.name}. You receive one short audio clip from a microphone in the room.
+
+Return JSON with:
+- relevant: true only if the clip contains Korean speech that must be translated under the MODE rules below. Set false for: speech in any other language (most likely the patient or a companion), silence, noise, dental equipment sounds (suction, drill), unintelligible audio, or fillers only ("음", "어").
+- transcript: the Korean sentence exactly as spoken (without the "${l.trig}" trigger word, if any). Omit fillers.
+- translation: what a kind, professional native ${l.name}-speaking dentist would say to the patient with the same meaning. Natural, short, spoken style, reassuring and patient-friendly, no technical jargon (explain terms in plain words). ${l.style}
+- pronunciation_ko: how to read the translation aloud, written in Hangul so a Korean speaker with no ${l.name} knowledge can say it understandably. Keep punctuation. Example: ${l.ex}
+- cut_off: true if the Korean clip ends in the middle of a sentence. Then translate only what was said and end the translation with "…".
+
+MODE (given with each request):
+- "all": translate every Korean utterance.
+- "trigger": translate only Korean utterances that start with "${l.trig}". Any other Korean speech is staff conversation: relevant=false.
+
+You may also receive the dentist's previous few Korean sentences as text context. Use them only to understand meaning (e.g., this clip may continue a cut-off sentence). Translate only the new audio clip.`;
+
+const INTERP_SCHEMA = {
+  type:'OBJECT',
+  properties:{ relevant:{type:'BOOLEAN'}, transcript:{type:'STRING'}, translation:{type:'STRING'},
+    pronunciation_ko:{type:'STRING'}, cut_off:{type:'BOOLEAN'} },
+  required:['relevant','transcript','translation','pronunciation_ko','cut_off']
+};
+
 let useThinkingCfg = true;
 const MODELS = ['gemini-3.5-flash-lite','gemini-3.8-flash','gemini-3.5-flash'];
 const TIMEOUT_MS = 10000;
@@ -524,12 +612,13 @@ async function callGemini(b64, context){
   throw lastErr;
 }
 async function callModel(model, b64, context){
+  const en = S.lang === 'en';
   const body = {
-    systemInstruction:{ parts:[{ text: SYSTEM }] },
+    systemInstruction:{ parts:[{ text: en ? SYSTEM : interpSystem(L()) }] },
     contents:[{ role:'user', parts:[
       { inlineData:{ mimeType:'audio/wav', data:b64 } },
-      { text: `KOREAN MODE: ${S.koMode}\n` + (context ? `Previous sentences by the dentist (context only):\n${context}\n\nAnalyze the new clip.` : 'Analyze this clip.') } ] }],
-    generationConfig:{ responseMimeType:'application/json', responseSchema:SCHEMA, temperature:0 }
+      { text: (en ? `KOREAN MODE: ${S.koMode}\n` : `MODE: ${S.xMode}\n`) + (context ? `Previous sentences by the dentist (context only):\n${context}\n\nAnalyze the new clip.` : 'Analyze this clip.') } ] }],
+    generationConfig:{ responseMimeType:'application/json', responseSchema: en ? SCHEMA : INTERP_SCHEMA, temperature:0 }
   };
   if (useThinkingCfg) body.generationConfig.thinkingConfig = { thinkingLevel:'low' };
   const ac = new AbortController(), timer = setTimeout(() => ac.abort(), TIMEOUT_MS);
@@ -673,20 +762,37 @@ function getCard(id){
   return el;
 }
 function removeCard(id){ cards.get(id)?.remove(); cards.delete(id); }
-function setIgnored(n){ $('ignored').textContent = n ? `무시한 소리 ${n}건 (한국어·잡음·환자 말 등)` : ''; }
+function setIgnored(n){ $('ignored').textContent = n ? `무시한 소리 ${n}건 (${S.lang === 'en' ? '한국어·' : ''}잡음·환자 말 등)` : ''; }
+
+// 🔊 read a translation aloud in the patient's language (tap = user gesture, so iOS allows it)
+function speak(text, tts){
+  const ss = window.speechSynthesis; if (!ss) return;
+  ss.cancel();
+  const u = new SpeechSynthesisUtterance(text); u.lang = tts; u.rate = 0.9;
+  const voice = ss.getVoices().find(x => x.lang.replace('_','-').toLowerCase().startsWith(tts.slice(0,2)));
+  if (voice) u.voice = voice;
+  ss.speak(u);
+}
+$('list').addEventListener('click', e => {
+  const b = e.target.closest('.say'); if (b) speak(b.dataset.say, b.dataset.tts);
+});
+window.speechSynthesis?.getVoices();
 
 const PILL = { wrong:'고쳐 말하기', awkward:'더 자연스럽게', minor:'작은 실수', translate:'영어 번역', ok:'좋아요' };
 function paint(id, p){
   const card = getCard(id);
   if (p.kind === 'pending'){ card.className = 'card pending'; card.textContent = '듣고 분석하는 중…'; return; }
   if (p.kind === 'err'){ card.className = 'card err'; card.textContent = '⚠️ ' + p.msg; return; }
-  const r = p.r, v = PILL[p.v] ? p.v : 'ok';
-  const head = `<div class="c-head"><span class="pill">${PILL[v]}</span><span class="meta">${esc(hhmm(new Date(p.at)))}</span></div>`;
+  const r = p.r, v = PILL[p.v] ? p.v : 'ok', l = LANGS[p.lang] || LANGS.en;
+  const pill = v === 'translate' ? l.ko + ' 번역' : PILL[v];
+  const say = v === 'translate' ? `<button class="say" data-say="${esc(r.corrected)}" data-tts="${l.tts}">🔊 듣기</button>` : '';
+  const head = `<div class="c-head"><span class="pill">${esc(pill)}</span>${say}<span class="meta">${esc(hhmm(new Date(p.at)))}</span></div>`;
   card.className = 'card ' + v;
   if (v === 'ok'){
     card.innerHTML = `${head}<div class="fix">${esc(r.transcript)}</div>`;
   } else if (v === 'translate'){
-    card.innerHTML = `${head}<div class="fix">${esc(r.corrected)}</div>
+    card.innerHTML = `${head}<div class="fix" lang="${l.tts.slice(0,2)}">${esc(r.corrected)}</div>
+      ${r.pron ? `<div class="pron"><span class="lbl">읽는 법</span>${esc(r.pron)}</div>` : ''}
       <div class="said"><span class="lbl">한국어</span>${esc(r.transcript)}</div>`;
   } else {
     card.innerHTML = `${head}<div class="fix">${esc(r.corrected)}</div>
@@ -707,15 +813,19 @@ async function analyze(wav){
   const id = 'c' + Date.now() + '_' + (++cardSeq), at = new Date().toISOString();
   show(id, { kind:'pending' });
   try{
-    const context = session.slice(-3).map(x => '- ' + x.transcript + (x.cut_off ? ' (cut off)' : '')).join('\n');
-    const r = await callGemini(toBase64(wav), context);
+    const lang = S.lang;
+    const context = session.filter(x => x.lang === lang).slice(-3).map(x => '- ' + x.transcript + (x.cut_off ? ' (cut off)' : '')).join('\n');
+    let r = await callGemini(toBase64(wav), context);
     if (!r.relevant || !r.transcript){
       hide(id); ignoredCount++; setIgnored(ignoredCount); link.send({ t:'ignored', n: ignoredCount }); return; }
+    // interpreter result -> same shape as a coach "translate" card
+    if (lang !== 'en') r = { relevant:true, transcript:r.transcript, corrected:r.translation, pron:r.pronunciation_ko,
+      verdict:'translate', explanation_ko:'', plain_tip:'', cut_off:!!r.cut_off, continuation:'' };
     let v = r.verdict;
     if (v === 'minor' && !S.showMinor) v = 'ok';
-    session.push({ at, ...r });
+    session.push({ at, lang, ...r });
     if (v === 'ok' && !S.showOk){ hide(id); return; }
-    show(id, { kind:'res', r, v, at });
+    show(id, { kind:'res', r, v, at, lang });
   }catch(e){
     const s = e.status;
     const msg = (s===400||s===403 ? 'API 키 또는 모델 설정을 확인해 주세요.'
@@ -733,6 +843,7 @@ $('btnReview').onclick = () => {
   const items = session.filter(r => r.verdict==='wrong' || r.verdict==='awkward' || r.verdict==='translate' || (S.showMinor && r.verdict==='minor') || r.plain_tip);
   $('reviewList').innerHTML = items.length ? items.map(r => `<div class="rv">
     <div class="said">${esc(r.transcript)}</div><div class="fix">→ ${esc(r.corrected)}</div>
+    ${r.pron ? `<div class="pron">${esc(r.pron)}</div>`:''}
     ${r.explanation_ko ? `<div class="why">${esc(r.explanation_ko)}</div>`:''}
     ${r.plain_tip ? `<div class="tip">${esc(r.plain_tip)}</div>`:''}</div>`).join('')
     : '<div class="empty">아직 교정된 문장이 없습니다.</div>';
@@ -741,7 +852,7 @@ $('btnReview').onclick = () => {
 $('rClose').onclick = $('rX').onclick = () => $('mReview').classList.remove('show');
 $('rCopy').onclick = async () => {
   const text = session.filter(r => r.verdict!=='ok').map(r =>
-    `✗ ${r.transcript}\n✓ ${r.corrected}${r.explanation_ko ? '\n  - '+r.explanation_ko : ''}${r.plain_tip ? '\n  - '+r.plain_tip : ''}`).join('\n\n');
+    `✗ ${r.transcript}\n✓ ${r.corrected}${r.pron ? '\n  ('+r.pron+')' : ''}${r.explanation_ko ? '\n  - '+r.explanation_ko : ''}${r.plain_tip ? '\n  - '+r.plain_tip : ''}`).join('\n\n');
   try{ await navigator.clipboard.writeText(text || '(없음)'); $('rCopy').textContent = '복사됨 ✓'; }
   catch{ $('rCopy').textContent = '복사 실패'; }
   setTimeout(() => $('rCopy').textContent = '텍스트로 복사', 1500);
@@ -767,8 +878,13 @@ if (location.hash === '#demo'){
       corrected:'So I think we need to do one more root canal on the third tooth from the back.', explanation_ko:'환자와 함께하는 치료는 we를 쓰면 더 자연스러워요.' } },
     { v:'wrong', at:t(0), r:{ transcript:'You have pain since when? You have pulpitis so', corrected:'How long have you had the pain? You have inflammation in the nerve, so…',
       explanation_ko:'기간을 물을 때는 How long + 현재완료를 써요.', cut_off:true, continuation:'…we need to do a root canal.', plain_tip:'pulpitis → inflammation of the nerve' } },
+    { v:'translate', lang:'fr', at:t(0), r:{ transcript:'오늘은 충치 치료하고, 마취는 조금 따끔할 거예요.',
+      corrected:"Aujourd'hui, on soigne la carie. L'anesthésie va piquer un tout petit peu.", pron:'오주르뒤, 옹 수아뉴 라 카리. 라네스테지 바 피케 앙 뚜 쁘띠 쁘.' } },
+    { v:'translate', lang:'ja', at:t(0), r:{ transcript:'아프면 왼손을 들어 주세요.',
+      corrected:'痛かったら、左手を挙げてください。', pron:'이타캇타라, 히다리테오 아게테 쿠다사이.' } },
   ].forEach((c, i) => paint('demo' + i, { kind:'res', ...c }));
 }
+applyLang();
 if (link.role === 'screen') startScreen();
 else if (link.role === 'mic' && link.code) connectMic(link.code);
 if (!S.apiKey && link.role !== 'screen') setTimeout(openSettings, 300);
