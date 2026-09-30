@@ -55,6 +55,7 @@ main{padding:14px 16px 80px;max-width:1100px;margin:0 auto}
 .card.minor .fix{font-size:calc(18px*var(--fs));font-weight:600}
 .why{font-size:calc(15px*var(--fs));margin-top:6px}
 .tip{font-size:calc(14px*var(--fs));margin-top:4px;color:var(--green)}
+.cont{font-size:calc(16px*var(--fs));margin-top:4px;color:var(--sub);font-style:italic}
 .meta{font-size:12px;color:var(--sub);float:right}
 .ignored{font-size:12px;color:var(--sub);text-align:center;margin:6px 0 12px}
 /* modal */
@@ -94,7 +95,7 @@ a{color:#3b82f6}
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">대기 중</span></div>
   </div>
   <div class="meter-wrap">
-    <div class="meter"><i id="lvl"></i><b id="thr"></b></div>
+    <div class="sens">🎤 소리<div class="meter" style="flex:1"><i id="lvl"></i><b id="thr"></b></div></div>
     <div class="sens">민감도
       <input type="range" id="sens" min="1" max="100" value="40">
       <span id="sensVal"></span>
@@ -214,7 +215,7 @@ async function fillMics(){
 // ---------- audio capture + VAD ----------
 let running = false, ctx, stream, src, proc, sink, wakeLock;
 let state = 'idle', chunks = [], preroll = [], silentMs = 0, voicedMs = 0, totalMs = 0, lastRms = 0;
-const PREROLL_MS = 300, END_SILENCE_MS = 900, MAX_MS = 15000, MIN_VOICED_MS = 350;
+const PREROLL_MS = 300, END_SILENCE_MS = 1300, MAX_MS = 15000, MIN_VOICED_MS = 350;
 
 function setStatus(text, cls){ $('statusText').textContent = text; $('dot').className = 'dot ' + (cls||''); }
 
@@ -329,30 +330,35 @@ Return JSON with:
   "awkward" = understandable but unnatural, too blunt, or could sound cold/rude to a patient.
   "wrong" = grammatically wrong in a way that is noticeable, or could be misunderstood.
 - corrected: what a friendly native-English-speaking dentist would naturally say, keeping the same meaning. Short, spoken style, polite and patient-friendly. If verdict is "ok", repeat the transcript.
-- explanation_ko: ONE short Korean sentence (max ~40 Korean characters) explaining the key fix. Empty string if "ok".
+- explanation_ko: ONE short, simple, grammatically correct Korean sentence (max ~40 Korean characters) explaining the key fix, written in natural 해요체 (e.g., "기간을 물을 때는 How long을 써요."). Use only common Korean words; never invent syllables. Empty string if "ok".
 - plain_tip: if the dentist used dental jargon a layperson may not understand (e.g., pulpitis, periapical, occlusion, endodontic), give a plain-English alternative like "pulpitis → inflammation of the nerve". Otherwise empty string.
 
-Do not flag contractions, casual spoken style, or natural sentence fragments. Be strict about real mistakes, lenient about style.`;
+- cut_off: true if the clip ends in the middle of a sentence (the dentist paused or was interrupted).
+- continuation: only when cut_off is true, a short natural guess of how the dentist's sentence most likely continues, based on the context and dental situation. Write only the missing ending, starting with "…" (e.g., "…going to take it slowly."). Otherwise empty string.
+
+You may also receive the dentist's previous few sentences as text context. Use them only to understand meaning (e.g., this clip may be the second half of a previous cut-off sentence). Analyze and correct only the new audio clip.
+If the clip is cut off, correct only the part that was spoken, end "corrected" with "…", and do not mark the cut-off itself as a mistake. Do not flag contractions, casual spoken style, or natural sentence fragments. Be strict about real mistakes, lenient about style.`;
 
 const SCHEMA = {
   type:'OBJECT',
   properties:{
     relevant:{type:'BOOLEAN'}, transcript:{type:'STRING'},
     verdict:{type:'STRING', enum:['ok','minor','awkward','wrong']},
-    corrected:{type:'STRING'}, explanation_ko:{type:'STRING'}, plain_tip:{type:'STRING'}
+    corrected:{type:'STRING'}, explanation_ko:{type:'STRING'}, plain_tip:{type:'STRING'},
+    cut_off:{type:'BOOLEAN'}, continuation:{type:'STRING'}
   },
-  required:['relevant','transcript','verdict','corrected','explanation_ko','plain_tip']
+  required:['relevant','transcript','verdict','corrected','explanation_ko','plain_tip','cut_off','continuation']
 };
 
 let useThinkingCfg = true;
 const MODELS = ['gemini-3.5-flash-lite','gemini-3.8-flash','gemini-3.5-flash'];
 const TIMEOUT_MS = 10000;
 // try the chosen model first; on overload/timeout, fall back to the others
-async function callGemini(b64){
+async function callGemini(b64, context){
   const order = [S.model, ...MODELS.filter(m => m !== S.model)];
   let lastErr;
   for (const model of order){
-    try{ return await callModel(model, b64); }
+    try{ return await callModel(model, b64, context); }
     catch(e){
       lastErr = e;
       const retryable = e.name === 'AbortError' || e.status === 503 || e.status === 500 || e.status === 429;
@@ -361,13 +367,16 @@ async function callGemini(b64){
   }
   throw lastErr;
 }
-async function callModel(model, b64){
+async function callModel(model, b64, context){
   const body = {
     systemInstruction:{ parts:[{ text: SYSTEM }] },
     contents:[{ role:'user', parts:[
       { inlineData:{ mimeType:'audio/wav', data:b64 } },
-      { text:'Analyze this clip.' } ] }],
-    generationConfig:{ responseMimeType:'application/json', responseSchema:SCHEMA, temperature:0.2 }
+      { text: context ? `Previous sentences by the dentist (context only):
+${context}
+
+Analyze the new clip.` : 'Analyze this clip.' } ] }],
+    generationConfig:{ responseMimeType:'application/json', responseSchema:SCHEMA, temperature:0 }
   };
   if (useThinkingCfg) body.generationConfig.thinkingConfig = { thinkingLevel:'low' };
   const ac = new AbortController(), timer = setTimeout(() => ac.abort(), TIMEOUT_MS);
@@ -380,7 +389,7 @@ async function callModel(model, b64){
   } finally { clearTimeout(timer); }
   if (!res.ok){
     const t = await res.text();
-    if (res.status === 400 && useThinkingCfg && /thinking/i.test(t)){ useThinkingCfg = false; return callModel(model, b64); }
+    if (res.status === 400 && useThinkingCfg && /thinking/i.test(t)){ useThinkingCfg = false; return callModel(model, b64, context); }
     const err = new Error(t); err.status = res.status; throw err;
   }
   const j = await res.json();
@@ -408,7 +417,8 @@ function alertCard(msg){
 async function analyze(wav){
   const card = newCard(), at = new Date();
   try{
-    const r = await callGemini(toBase64(wav));
+    const context = session.slice(-3).map(x => '- ' + x.transcript + (x.cut_off ? ' (cut off)' : '')).join('\n');
+    const r = await callGemini(toBase64(wav), context);
     if (!r.relevant || !r.transcript){ card.remove(); ignoredCount++;
       $('ignored').textContent = `무시한 소리 ${ignoredCount}건 (한국어·잡음·환자 말 등)`; return; }
     let v = r.verdict;
@@ -425,6 +435,7 @@ async function analyze(wav){
         <div class="fix">✅ ${esc(r.corrected)}</div>
         ${r.explanation_ko ? `<div class="why">💬 ${esc(r.explanation_ko)}</div>` : ''}`;
     }
+    if (r.cut_off && r.continuation) card.innerHTML += `<div class="cont">💡 이어서 말한다면: ${esc(r.continuation)}</div>`;
     if (r.plain_tip) card.innerHTML += `<div class="tip">🗣 쉬운 말: ${esc(r.plain_tip)}</div>`;
   }catch(e){
     card.className = 'card err';
