@@ -59,11 +59,11 @@ main{max-width:1100px;margin:0 auto;padding:16px 16px calc(150px + env(safe-area
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--line)}
 .card.wrong::before{background:var(--wrong)} .card.awkward::before{background:var(--awk)}
-.card.translate::before{background:var(--tr)} .card.minor::before{background:var(--awk)} .card.ok::before{background:var(--okc)}
+.card.translate::before{background:var(--tr)} .card.heard::before{background:var(--accent)} .card.minor::before{background:var(--awk)} .card.ok::before{background:var(--okc)}
 .c-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--bg);color:var(--sub)}
 .wrong .pill{background:var(--wrong-bg);color:var(--wrong)} .awkward .pill{background:var(--awk-bg);color:var(--awk)}
-.translate .pill{background:var(--tr-bg);color:var(--tr)} .minor .pill{background:var(--awk-bg);color:var(--awk)} .ok .pill{background:var(--accent-soft);color:var(--okc)}
+.translate .pill{background:var(--tr-bg);color:var(--tr)} .heard .pill{background:var(--accent-soft);color:var(--accent)} .minor .pill{background:var(--awk-bg);color:var(--awk)} .ok .pill{background:var(--accent-soft);color:var(--okc)}
 .meta{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
 .fix{font-size:calc(26px*var(--fs));font-weight:700;line-height:1.32;letter-spacing:-.02em}
 .said{font-size:calc(16px*var(--fs));color:var(--sub);margin-top:6px;line-height:1.4}
@@ -241,8 +241,8 @@ body.screen-mode main{padding-bottom:40px}
   <div class="field">
     <select id="lang">
       <option value="en">🇺🇸 영어 — 내 영어 교정 + "영어로" 번역</option>
-      <option value="fr">🇫🇷 프랑스어 — 한국어로 말하면 통역</option>
-      <option value="ja">🇯🇵 일본어 — 한국어로 말하면 통역</option>
+      <option value="fr">🇫🇷 프랑스어 — 한국어 ↔ 프랑스어 통역</option>
+      <option value="ja">🇯🇵 일본어 — 한국어 ↔ 일본어 통역</option>
     </select>
     <small>상단 <b>언어</b> 버튼으로도 바로 바꿀 수 있습니다.</small>
   </div>
@@ -252,7 +252,7 @@ body.screen-mode main{padding-bottom:40px}
       <option value="all">한국어는 모두 번역 (추천)</option>
       <option value="trigger">"프랑스어로" / "일본어로"라고 시작할 때만 번역</option>
     </select>
-    <small>직원끼리 하는 한국어 대화까지 번역돼서 불편하면 아래 방식으로 바꾸세요.</small>
+    <small>직원끼리 하는 한국어 대화까지 번역돼서 불편하면 아래 방식으로 바꾸세요. 환자가 프랑스어·일본어로 말하면 어느 방식이든 한국어로 번역해 드립니다.</small>
   </div>
 
   <div class="group">AI 연결</div>
@@ -354,7 +354,7 @@ const S = {
 document.documentElement.style.setProperty('--fs', S.fs);
 
 // ---------- languages ----------
-// en = coach my English; fr/ja = interpret my Korean for the patient (same pipeline, different prompt)
+// en = coach my English; fr/ja = interpret both ways: my Korean for the patient, the patient's speech into Korean (same pipeline, different prompt)
 const LANGS = {
   en:{ code:'EN', ko:'영어', name:'English', tts:'en-US', sub:'Dental English Coach' },
   fr:{ code:'FR', ko:'프랑스어', name:'French', tts:'fr-FR', sub:'Dental French · 통역', trig:'프랑스어로',
@@ -366,7 +366,7 @@ const LANGS = {
 };
 if (!LANGS[S.lang]) S.lang = 'en';
 const L = () => LANGS[S.lang];
-const listenText = () => S.lang === 'en' ? '듣는 중 · 영어로 말씀하세요' : `듣는 중 · 한국어로 말씀하세요 (${L().ko}로 통역)`;
+const listenText = () => S.lang === 'en' ? '듣는 중 · 영어로 말씀하세요' : `듣는 중 · 한국어 ↔ ${L().ko} 통역`;
 function applyLang(){
   const l = L(), en = S.lang === 'en';
   $('langCode').textContent = l.code;
@@ -377,7 +377,7 @@ function applyLang(){
   $('eStep2').innerHTML = en ? '평소처럼 환자에게<br>영어로 말하세요' : '평소처럼<br>한국어로 말하세요';
   $('eStep3').innerHTML = en ? '2~3초 뒤 교정 문장이<br>크게 표시됩니다' : `2~3초 뒤 ${esc(l.ko)} 문장이<br>크게 표시됩니다`;
   $('eHint').innerHTML = en ? '한국어는 <b>"영어로, …"</b> 라고 시작하면 영어로 번역해 드립니다.'
-    : `🔊 버튼을 누르면 ${esc(l.ko)}로 읽어줍니다. 환자에게 화면을 보여주셔도 됩니다.`;
+    : `🔊 버튼을 누르면 ${esc(l.ko)}로 읽어줍니다. 환자에게 화면을 보여주셔도 됩니다.<br>환자가 <b>${esc(l.ko)}로 말하면 한국어로</b> 번역해서 보여드립니다.`;
   if (running) setStatus(listenText(), document.body.dataset.mic);
 }
 $('btnLang').onclick = () => {
@@ -480,6 +480,7 @@ function onAudio(e){
   const loud = rms > thresholdOf(S.sens);
 
   if (state === 'idle'){
+    if (window.speechSynthesis?.speaking){ preroll = []; return; }   // don't record our own 🔊 playback
     preroll.push(data);
     while (preroll.length * ms > PREROLL_MS) preroll.shift();
     if (loud){ state='speaking'; chunks = preroll.slice(); preroll = []; silentMs=0; voicedMs=ms; totalMs=chunks.length*ms;
@@ -571,27 +572,41 @@ const SCHEMA = {
   required:['relevant','transcript','verdict','corrected','explanation_ko','plain_tip','cut_off','continuation']
 };
 
-// interpreter mode (fr/ja): the dentist speaks Korean, we give the patient-facing sentence + a Hangul reading guide
-const interpSystem = l => `You are a real-time medical interpreter for a Korean dentist treating a ${l.name}-speaking patient in a dental clinic treatment room. The dentist does not speak ${l.name}. You receive one short audio clip from a microphone in the room.
+// interpreter mode (fr/ja): the dentist speaks Korean -> patient-facing sentence + a Hangul reading guide;
+// the patient speaks their language -> Korean for the dentist
+const interpSystem = l => `You are a real-time two-way medical interpreter between a Korean dentist and a ${l.name}-speaking patient in a dental clinic treatment room. The dentist does not speak ${l.name}; the patient does not speak Korean. You receive one short audio clip from a microphone in the room.
+
+First decide who is speaking by the language of the clip:
+- Korean speech -> speaker = "dentist".
+- ${l.name} speech -> speaker = "patient" (the patient or a companion).
 
 Return JSON with:
-- relevant: true only if the clip contains Korean speech that must be translated under the MODE rules below. Set false for: speech in any other language (most likely the patient or a companion), silence, noise, dental equipment sounds (suction, drill), unintelligible audio, or fillers only ("음", "어").
+- relevant: true if the clip contains Korean speech that must be translated under the MODE rules below, or ${l.name} speech by the patient. Set false for: speech in any other language, silence, noise, dental equipment sounds (suction, drill), unintelligible audio, or fillers only ("음", "어", "euh").
+- speaker: "dentist" or "patient".
+- cut_off: true if the clip ends in the middle of a sentence. Then translate only what was said and end the translation with "…".
+
+When speaker = "dentist" (Korean):
 - transcript: the Korean sentence exactly as spoken (without the "${l.trig}" trigger word, if any). Omit fillers.
 - translation: what a kind, professional native ${l.name}-speaking dentist would say to the patient with the same meaning. Natural, short, spoken style, reassuring and patient-friendly, no technical jargon (explain terms in plain words). ${l.style}
 - pronunciation_ko: how to read the translation aloud, written in Hangul so a Korean speaker with no ${l.name} knowledge can say it understandably. Keep punctuation. Example: ${l.ex}
-- cut_off: true if the Korean clip ends in the middle of a sentence. Then translate only what was said and end the translation with "…".
 
-MODE (given with each request):
+When speaker = "patient" (${l.name}):
+- transcript: the ${l.name} sentence exactly as spoken, in normal ${l.name} spelling. Omit fillers.
+- translation: an accurate, natural Korean translation for the dentist, in polite 해요체, keeping the patient's meaning exactly (symptoms, location, duration, questions, worries). Do not add or soften anything. Use only common Korean words; never invent syllables.
+- pronunciation_ko: "" (empty string).
+- EXCEPTION: if the ${l.name} clip only repeats a translation you gave in the previous sentences (the dentist reading it aloud, or the app's speaker playing it), set relevant=false.
+
+MODE (given with each request) applies to Korean speech only; ${l.name} speech by the patient is always translated:
 - "all": translate every Korean utterance.
 - "trigger": translate only Korean utterances that start with "${l.trig}". Any other Korean speech is staff conversation: relevant=false.
 
-You may also receive the dentist's previous few Korean sentences as text context. Use them only to understand meaning (e.g., this clip may continue a cut-off sentence). Translate only the new audio clip.`;
+You may also receive the previous few sentences of the conversation as text context (dentist lines with the translation you gave, patient lines marked "(patient)"). Use them only to understand meaning (e.g., this clip may continue a cut-off sentence, or answer a question). Translate only the new audio clip.`;
 
 const INTERP_SCHEMA = {
   type:'OBJECT',
-  properties:{ relevant:{type:'BOOLEAN'}, transcript:{type:'STRING'}, translation:{type:'STRING'},
-    pronunciation_ko:{type:'STRING'}, cut_off:{type:'BOOLEAN'} },
-  required:['relevant','transcript','translation','pronunciation_ko','cut_off']
+  properties:{ relevant:{type:'BOOLEAN'}, speaker:{type:'STRING', enum:['dentist','patient']}, transcript:{type:'STRING'},
+    translation:{type:'STRING'}, pronunciation_ko:{type:'STRING'}, cut_off:{type:'BOOLEAN'} },
+  required:['relevant','speaker','transcript','translation','pronunciation_ko','cut_off']
 };
 
 let useThinkingCfg = true;
@@ -617,7 +632,7 @@ async function callModel(model, b64, context){
     systemInstruction:{ parts:[{ text: en ? SYSTEM : interpSystem(L()) }] },
     contents:[{ role:'user', parts:[
       { inlineData:{ mimeType:'audio/wav', data:b64 } },
-      { text: (en ? `KOREAN MODE: ${S.koMode}\n` : `MODE: ${S.xMode}\n`) + (context ? `Previous sentences by the dentist (context only):\n${context}\n\nAnalyze the new clip.` : 'Analyze this clip.') } ] }],
+      { text: (en ? `KOREAN MODE: ${S.koMode}\n` : `MODE: ${S.xMode}\n`) + (context ? `Previous sentences ${en ? 'by the dentist' : 'of the conversation'} (context only):\n${context}\n\nAnalyze the new clip.` : 'Analyze this clip.') } ] }],
     generationConfig:{ responseMimeType:'application/json', responseSchema: en ? SCHEMA : INTERP_SCHEMA, temperature:0 }
   };
   if (useThinkingCfg) body.generationConfig.thinkingConfig = { thinkingLevel:'low' };
@@ -778,7 +793,7 @@ $('list').addEventListener('click', e => {
 });
 window.speechSynthesis?.getVoices();
 
-const PILL = { wrong:'고쳐 말하기', awkward:'더 자연스럽게', minor:'작은 실수', translate:'영어 번역', ok:'좋아요' };
+const PILL = { wrong:'고쳐 말하기', awkward:'더 자연스럽게', minor:'작은 실수', translate:'영어 번역', heard:'환자 말', ok:'좋아요' };
 function paint(id, p){
   const card = getCard(id);
   if (p.kind === 'pending'){ card.className = 'card pending'; card.textContent = '듣고 분석하는 중…'; return; }
@@ -790,6 +805,9 @@ function paint(id, p){
   card.className = 'card ' + v;
   if (v === 'ok'){
     card.innerHTML = `${head}<div class="fix">${esc(r.transcript)}</div>`;
+  } else if (v === 'heard'){   // the patient's speech, shown in Korean
+    card.innerHTML = `${head}<div class="fix">${esc(r.corrected)}</div>
+      <div class="said" lang="${l.tts.slice(0,2)}"><span class="lbl" lang="ko">${esc(l.ko)}</span>${esc(r.transcript)}</div>`;
   } else if (v === 'translate'){
     card.innerHTML = `${head}<div class="fix" lang="${l.tts.slice(0,2)}">${esc(r.corrected)}</div>
       ${r.pron ? `<div class="pron"><span class="lbl">읽는 법</span>${esc(r.pron)}</div>` : ''}
@@ -814,13 +832,15 @@ async function analyze(wav){
   show(id, { kind:'pending' });
   try{
     const lang = S.lang;
-    const context = session.filter(x => x.lang === lang).slice(-3).map(x => '- ' + x.transcript + (x.cut_off ? ' (cut off)' : '')).join('\n');
+    const context = session.filter(x => x.lang === lang).slice(-3).map(x => '- ' + (x.verdict === 'heard' ? '(patient) ' : '') + x.transcript + (x.cut_off ? ' (cut off)' : '')
+      + (lang !== 'en' && x.verdict === 'translate' ? ' → ' + x.corrected : '')).join('\n');
     let r = await callGemini(toBase64(wav), context);
     if (!r.relevant || !r.transcript){
       hide(id); ignoredCount++; setIgnored(ignoredCount); link.send({ t:'ignored', n: ignoredCount }); return; }
-    // interpreter result -> same shape as a coach "translate" card
-    if (lang !== 'en') r = { relevant:true, transcript:r.transcript, corrected:r.translation, pron:r.pronunciation_ko,
-      verdict:'translate', explanation_ko:'', plain_tip:'', cut_off:!!r.cut_off, continuation:'' };
+    // interpreter result -> same shape as a coach "translate" card ("heard" when it was the patient speaking)
+    const heard = r.speaker === 'patient';
+    if (lang !== 'en') r = { relevant:true, transcript:r.transcript, corrected:r.translation, pron:heard ? '' : r.pronunciation_ko,
+      verdict:heard ? 'heard' : 'translate', explanation_ko:'', plain_tip:'', cut_off:!!r.cut_off, continuation:'' };
     let v = r.verdict;
     if (v === 'minor' && !S.showMinor) v = 'ok';
     session.push({ at, lang, ...r });
@@ -851,7 +871,7 @@ $('btnReview').onclick = () => {
 };
 $('rClose').onclick = $('rX').onclick = () => $('mReview').classList.remove('show');
 $('rCopy').onclick = async () => {
-  const text = session.filter(r => r.verdict!=='ok').map(r =>
+  const text = session.filter(r => r.verdict!=='ok' && r.verdict!=='heard').map(r =>
     `✗ ${r.transcript}\n✓ ${r.corrected}${r.pron ? '\n  ('+r.pron+')' : ''}${r.explanation_ko ? '\n  - '+r.explanation_ko : ''}${r.plain_tip ? '\n  - '+r.plain_tip : ''}`).join('\n\n');
   try{ await navigator.clipboard.writeText(text || '(없음)'); $('rCopy').textContent = '복사됨 ✓'; }
   catch{ $('rCopy').textContent = '복사 실패'; }
@@ -880,6 +900,8 @@ if (location.hash === '#demo'){
       explanation_ko:'기간을 물을 때는 How long + 현재완료를 써요.', cut_off:true, continuation:'…we need to do a root canal.', plain_tip:'pulpitis → inflammation of the nerve' } },
     { v:'translate', lang:'fr', at:t(0), r:{ transcript:'오늘은 충치 치료하고, 마취는 조금 따끔할 거예요.',
       corrected:"Aujourd'hui, on soigne la carie. L'anesthésie va piquer un tout petit peu.", pron:'오주르뒤, 옹 수아뉴 라 카리. 라네스테지 바 피케 앙 뚜 쁘띠 쁘.' } },
+    { v:'heard', lang:'fr', at:t(0), r:{ transcript:"J'ai mal à cette dent depuis trois jours, surtout quand je bois quelque chose de froid.",
+      corrected:'사흘 전부터 이 이가 아파요. 특히 차가운 걸 마실 때요.' } },
     { v:'translate', lang:'ja', at:t(0), r:{ transcript:'아프면 왼손을 들어 주세요.',
       corrected:'痛かったら、左手を挙げてください。', pron:'이타캇타라, 히다리테오 아게테 쿠다사이.' } },
   ].forEach((c, i) => paint('demo' + i, { kind:'res', ...c }));
